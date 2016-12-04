@@ -38,7 +38,8 @@ class Application(tornado.web.Application):
                     (r"/AddDataPoint[/]?",    skh.UploadLabeledDatapointHandler),
                     (r"/GetNewDatasetId[/]?", skh.RequestNewDatasetId),
                     (r"/UpdateModel[/]?",     skh.UpdateModelForDatasetId),     
-                    (r"/PredictOne[/]?",      skh.PredictOneFromDatasetId),               
+                    (r"/PredictOne[/]?",      skh.PredictOneFromDatasetId), 
+                    (r"/TestTensorFlow[/]?",  skh.TestTensorFlow),              
                     ]
 
         self.handlers_string = str(handlers)
