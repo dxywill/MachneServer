@@ -11,6 +11,7 @@ from tornado.options import define, options
 from basehandler import BaseHandler
 
 from sklearn.svm import SVR
+from sklearn import linear_model
 from sklearn.neighbors import KNeighborsClassifier
 import pickle
 from bson.binary import Binary
@@ -129,16 +130,13 @@ class UploadLabeledDatapointHandler(BaseHandler):
         data = json.loads(self.request.body.decode("utf-8"))
         sess  = data['dsid']
 
-        # for index, features in enumerate(data["features"]):      
-        #     fvals = [float(val) for val in features]
-        #     direction = float(data["x"][index])
-        #     coordinateY = float(data["y"][index])
-
-        fvals = [float(val) for val in data["features"]]
-        label = int(data["direction"])
-        dbid = self.db.labeledinstances.insert(
-            {"feature":fvals,"direction":label,"dsid":sess}
-            );
+        for index, features in enumerate(data["features"]):      
+            fvals = [float(val) for val in features]
+            coordinateX = float(data["x"][index])
+            coordinateY = float(data["y"][index])
+            dbid = self.db.labeledinstances.insert(
+                {"feature":fvals,"labelX":coordinateX, "labelY":coordinateY,"dsid":sess}
+                );
         self.write_json({"result":"ok"})
 
 class RequestNewDatasetId(BaseHandler):
@@ -156,23 +154,22 @@ class UpdateModelForDatasetId(BaseHandler):
         #dsid = self.get_int_arg("dsid",default=0)
         dsid = 99
 
-        # # create feature vectors from database
-        # f=[];
+        # create feature vectors from database
+        # f=[]
+        # lx=[]
+        # ly=[]
         # for a in self.db.labeledinstances.find({"dsid":dsid}): 
         #     f.append([float(val) for val in a['feature']])
-
-        # # create label vector from database
-        # lx=[];
-        # for a in self.db.labeledinstances.find({"dsid":dsid}): 
         #     lx.append(a['labelX'])
-
-        # ly=[];
-        # for a in self.db.labeledinstances.find({"dsid":dsid}): 
         #     ly.append(a['labelY'])
 
         # # fit the model to the data
-        # c1 = SVR(kernel='rbf', C=1e3, gamma=0.1)
-        # c2 = SVR(kernel='rbf', C=1e3, gamma=0.1)
+        # # c1 = SVR(kernel='rbf')
+        # # c2 = SVR(kernel='rbf')
+
+        # c1 = linear_model.LinearRegression()
+        # c2 = linear_model.LinearRegression()
+
 
         # if lx:
         #     c1.fit(f,lx) # training
@@ -197,7 +194,7 @@ class UpdateModelForDatasetId(BaseHandler):
         labels = []
         for a in self.db.labeledinstances.find({"dsid":dsid}): 
             f.append([float(val) for val in a['feature']])
-            labels.append(a['direction'] )
+            labels.append(a['labelX'] * 10 + a['labelY'])
 
         c3 = KNeighborsClassifier(n_neighbors=3);
         if labels:
@@ -206,6 +203,8 @@ class UpdateModelForDatasetId(BaseHandler):
             self.db.models.update({"dsid":101},
                 {  "$set": {"model":Binary(bytes)}  },
                 upsert=True)
+
+
 
         # send back the resubstitution accuracy
         # if training takes a while, we are blocking tornado!! No!!
@@ -224,7 +223,9 @@ class PredictOneFromDatasetId(BaseHandler):
 
         # load the model from the database (using pickle)
         # we are blocking tornado!! no!!
-        print('Loading Model From DB')
+        # print('Loading Model From DB')
+        # print("Get feature")
+        # print(fvals)
         # tmp = self.db.models.find_one({"dsid":98})
         # cl1 = pickle.loads(tmp['model'])
         # predLabelX = cl1.predict(fvals);
@@ -238,6 +239,10 @@ class PredictOneFromDatasetId(BaseHandler):
         tmp = self.db.models.find_one({"dsid":101})
         cl3 = pickle.loads(tmp['model'])
         predLabel = cl3.predict(fvals);
-        print("direction" + str(predLabel[0]))
+        print("labels" + str(predLabel))
+        y = predLabel[0] % 10
+        x = predLabel[0] // 10
 
-        self.write_json({"direction":float(predLabel[0])})
+        print("x coordinate: " + str(x))
+        print("y coordinate: " + str(y))
+        self.write_json({"x":x, "y": y})
