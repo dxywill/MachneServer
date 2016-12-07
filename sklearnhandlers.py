@@ -132,10 +132,9 @@ class UploadLabeledDatapointHandler(BaseHandler):
 
         for index, features in enumerate(data["features"]):      
             fvals = [float(val) for val in features]
-            coordinateX = float(data["x"][index])
-            coordinateY = float(data["y"][index])
+            status = float(data["status"][index])
             dbid = self.db.labeledinstances.insert(
-                {"feature":fvals,"labelX":coordinateX, "labelY":coordinateY,"dsid":sess}
+                {"feature":fvals,"status":status,"dsid":sess}
                 );
         self.write_json({"result":"ok"})
 
@@ -152,7 +151,7 @@ class UpdateModelForDatasetId(BaseHandler):
         '''Train a new model (or update) for given dataset ID
         '''
         #dsid = self.get_int_arg("dsid",default=0)
-        dsid = 99
+        dsid = 201
 
         # create feature vectors from database
         # f=[]
@@ -194,13 +193,13 @@ class UpdateModelForDatasetId(BaseHandler):
         labels = []
         for a in self.db.labeledinstances.find({"dsid":dsid}): 
             f.append([float(val) for val in a['feature']])
-            labels.append(a['labelX'] * 10 + a['labelY'])
+            labels.append(a['status'])
 
         c3 = KNeighborsClassifier(n_neighbors=3);
         if labels:
             c3.fit(f, labels)
             bytes = pickle.dumps(c3)
-            self.db.models.update({"dsid":101},
+            self.db.models.update({"dsid":202},
                 {  "$set": {"model":Binary(bytes)}  },
                 upsert=True)
 
@@ -236,13 +235,10 @@ class PredictOneFromDatasetId(BaseHandler):
         # predLabelY = cl2.predict(fvals);
         # print("Y:" + str(predLabelY))
 
-        tmp = self.db.models.find_one({"dsid":101})
+        tmp = self.db.models.find_one({"dsid":202})
         cl3 = pickle.loads(tmp['model'])
         predLabel = cl3.predict(fvals);
         print("labels" + str(predLabel))
-        y = predLabel[0] % 10
-        x = predLabel[0] // 10
-
-        print("x coordinate: " + str(x))
-        print("y coordinate: " + str(y))
-        self.write_json({"x":x, "y": y})
+        y = predLabel[0]
+        print("status: " + str(y))
+        self.write_json({"status": y})
